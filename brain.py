@@ -1,3 +1,8 @@
+Python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import difflib
 import json
 import os
@@ -94,7 +99,7 @@ desktop_writer_tool = types.Tool(
 # 1. AI BRAIN (Gemini)
 # ----------------------------------------------------------------------------
  # Change your code to look something like this:
-api_key = "YOUR_API_KEY_HERE"
+api_key = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
 chat = None
