@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>AI OS</title>
+<style>
+:root{--ac:#4cc9f0;--bg:#0b0e17;--pn:#141926;--p2:#1c2333;--ln:rgba(255,255,255,.08);--tx:#e9edf5;--mt:#8b95a9;--gl:rgba(16,20,32,.66)}
+body.light{--bg:#eef1f7;--pn:#fff;--p2:#eef1f8;--ln:rgba(0,0,0,.1);--tx:#16202e;--mt:#5b667a;--gl:rgba(255,255,255,.74)}
+body.hc{--bg:#000;--pn:#000;--p2:#111;--ln:#ff0;--tx:#fff;--mt:#ff0;--ac:#0ff;--gl:#000}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;overflow:hidden;user-select:none;color:var(--tx);font:13.5px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;background:#0b0e17}
+textarea,input{user-select:text}
+
+#desk{position:absolute;inset:0;background:radial-gradient(circle at 30% 20%, #1b3cff, #07091a 70%);background-size:cover;transition:filter .2s}
+.mt{color:var(--mt)}a{color:var(--ac);cursor:pointer}
+.glass{background:var(--gl);backdrop-filter:blur(24px);border:1px solid var(--ln)}
+
+/* --- HOVER DETECTOR ZONES --- */
+#top-hover-zone { position: absolute; top: 0; left: 0; width: 380px; height: 20px; z-index: 1000; }
+#left-hover-zone { position: absolute; top: 0; left: 0; width: 25px; height: 100vh; z-index: 1000; }
+
+/* --- TOP-LEFT NAV ISLAND --- */
+#isl {
+  position: absolute; top: 0; left: 24px; display: flex; align-items: center; gap: 16px;
+  padding: 6px 18px 8px 18px; border-radius: 0 0 16px 16px; z-index: 999; white-space: nowrap;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); background: rgba(2, 62, 138, 0.55);
+  border: 1px solid rgba(72, 202, 228, 0.3); border-top: none; backdrop-filter: blur(24px);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease;
+}
+body.has-active-window #isl { transform: translateY(-100%); opacity: 0; }
+body.has-active-window #top-hover-zone:hover ~ #isl,
+body.has-active-window #isl:hover { transform: translateY(0); opacity: 1; }
+#isl b{font-weight:600;letter-spacing:0.5px}.ic{cursor:pointer}.logo{height:16px;color:var(--ac)}
+
+/* --- LEFT PURPLE NAV RAIL --- */
+#rail{
+  position:absolute; left:15px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column;
+  gap:8px; padding:10px 8px; border-radius:20px; z-index:900; background:rgba(40,15,60,0.75);
+  backdrop-filter:blur(24px); border:1px solid rgba(168,85,247,0.3); box-shadow:5px 0 20px rgba(0,0,0,0.5);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease;
+}
+body.has-active-window #rail { transform: translate(-150%, -50%); opacity: 0; }
+body.has-active-window #left-hover-zone:hover ~ #rail,
+body.has-active-window #rail:hover { transform: translate(0, -50%); opacity: 1; }
+.ri{position:relative;width:48px;height:48px;display:grid;place-items:center;font-size:24px;border-radius:14px;cursor:pointer;transition:background 0.2s}
+.ri:hover{background:rgba(255,255,255,0.15)}
+.ri.open::before{content:"";position:absolute;left:-8px;top:15px;height:18px;width:4px;border-radius:4px;background:var(--ac)}
+.ri::after{content:attr(data-n);position:absolute;left:60px;white-space:nowrap;padding:6px 10px;border-radius:8px;background:var(--pn);border:1px solid var(--ln);font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
+.ri:hover::after{opacity:1}
+
+/* --- ICONS & ORB --- */
+#icons{position:absolute;inset:0;pointer-events:none;z-index:10}
+.di{position:absolute;width:84px;padding:8px 4px;text-align:center;border-radius:8px;cursor:grab;text-shadow:0 2px 6px rgba(0,0,0,0.8);color:#fff;pointer-events:auto;transition:background 0.2s}
+.di:active{cursor:grabbing}
+.di:hover{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,0.1)}
+.di span{display:block;font-size:38px;pointer-events:none;margin-bottom:4px}
+
+#orbw{position:absolute;bottom:30px;right:30px;text-align:center;z-index:100;display:flex;flex-direction:column;align-items:center}
+#orb{width:80px;height:80px;border-radius:50%;position:relative;display:flex;justify-content:center;align-items:center;transition:all .4s}
+#orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 30% 30%, #4ea8de, #023e8a, #03045e);box-shadow:inset -10px -10px 20px rgba(0,0,0,0.7),0 10px 20px rgba(0,0,0,0.5);animation:nRot 15s linear infinite}
+@keyframes nRot{100%{transform:rotate(360deg)}}
+#orb.listening{transform:scale(1.15)}
+#orb.listening::before{box-shadow:0 0 35px #4cc9f0;filter:brightness(1.3)}
+#orb.thinking{animation:pl 1s infinite alternate}
+#orb.thinking::before{box-shadow:0 0 35px #a855f7;filter:hue-rotate(50deg)}
+#orb.speaking{transform:scale(1.05)}
+#orb.speaking::before{box-shadow:0 0 35px #2ecc71;filter:brightness(1.2) hue-rotate(-40deg)}
+@keyframes pl{to{transform:scale(1.1)}}
+#orbt{font-size:12px;font-weight:700;margin-top:12px;color:rgba(255,255,255,0.8);text-shadow:0 2px 4px rgba(0,0,0,0.8)}
+
+#sub{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);width:50%;max-width:700px;padding:14px 22px;border-radius:16px;text-align:center;z-index:100;opacity:0;transition:opacity .4s;pointer-events:none;background:rgba(20,20,30,0.8);backdrop-filter:blur(15px);border:1px solid rgba(255,255,255,0.1)}
+#sub.v{opacity:1}#sub b{display:block;font-size:11px;letter-spacing:1.5px;margin-bottom:6px;text-transform:uppercase}#sub div{font-size:18px;line-height:1.4}
+
+.win{position:absolute;display:none;flex-direction:column;background:var(--bg);border:1px solid var(--ln);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.7);overflow:hidden;min-width:320px;transform-origin:center bottom}
+.win.max{inset:0!important;width:100vw!important;height:100vh!important;border-radius:0!important;z-index:800!important}
+.win.dg webview{pointer-events:none}
+@keyframes genieIn{0%{transform:scale(0.05) translateY(50vh);opacity:0;border-radius:50%}100%{transform:scale(1) translateY(0);opacity:1;border-radius:12px}}
+@keyframes genieOut{0%{transform:scale(1) translateY(0);opacity:1;border-radius:12px}100%{transform:scale(0.05) translateY(50vh);opacity:0;border-radius:50%}}
+.win.open-anim{animation:genieIn 0.35s cubic-bezier(0.2,0.8,0.2,1) forwards}
+.win.close-anim{animation:genieOut 0.3s cubic-bezier(0.8,0,0.8,1) forwards}
+
+.wh{height:40px;background:var(--pn);display:flex;align-items:center;padding-left:16px;cursor:grab;border-bottom:1px solid var(--ln)}
+.wt{flex:1;font-weight:600;font-size:14px}.wc{display:flex}
+.wc b{width:46px;height:40px;display:grid;place-items:center;font-weight:400;cursor:pointer;font-size:16px}
+.wc b:hover{background:var(--p2)}.wc b.x:hover{background:#e5484d;color:#fff}
+.wb{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+
+button{background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit}
+button:hover{border-color:var(--ac)}button.pri{background:var(--ac);color:#001018;border-color:transparent;font-weight:600}
+input[type=text]{background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:8px 12px;font:inherit;outline:none}
+input[type=text]:focus{border-color:var(--ac)}
+.tb{display:flex;gap:8px;padding:10px 12px;align-items:center;background:var(--pn);border-bottom:1px solid var(--ln)}
+#ntxt{flex:1;background:transparent;color:var(--tx);border:0;padding:20px;font:15px Consolas,monospace;resize:none;outline:none}
+#cd{padding:20px 18px;font-size:32px;text-align:right;min-height:80px;word-break:break-all}
+.cg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}.cg button{padding:16px 0;font-size:18px}
+
+#ctx{position:absolute;background:rgba(32,32,32,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,0.6);display:none;z-index:9999;min-width:240px;color:#fff;font-size:13px;backdrop-filter:blur(25px)}
+.ctx-item{padding:8px 12px;display:flex;align-items:center;gap:12px;border-radius:4px;cursor:pointer}
+.ctx-item:hover{background:rgba(255,255,255,0.1)}
+.ctx-div{height:1px;background:rgba(255,255,255,0.1);margin:4px 0}
+.ctx-icon{width:16px;text-align:center;opacity:0.8}
+.ctx-arrow{margin-left:auto;font-size:10px;opacity:0.6}
+</style></head>
+<body>
+<div id="error-log" style="position:absolute;top:0;left:0;width:100%;background:red;color:white;padding:10px;z-index:10000;display:none;font-family:monospace;font-size:12px"></div>
+<div id="desk">
+  
+  <div id="top-hover-zone"></div>
+  <div id="left-hover-zone"></div>
+
+  <div id="isl" class="glass">
+    <span><img src="my-logo.png" class="logo" onerror="this.replaceWith('◆')"> <b>AI OS</b></span>
+    <span class="mt" style="margin-left:10px" id="top-date"></span><b id="top-time"></b>
+    <span style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 4px"></span>
+    <span class="ic" id="top-bt" title="Bluetooth">ᛒ</span>
+    <span id="top-wifi" title="Wi-Fi">📶</span>
+    <span id="top-battery" title="Battery">🔋</span>
+  </div>
+
+  <div id="rail">
+    <div class="ri" id="r-browser" data-n="Browser" onclick="toggle('browser')">🌐</div>
+    <div class="ri" id="r-notes" data-n="Notes" onclick="toggle('notes')">📝</div>
+    <div class="ri" id="r-mypc" data-n="My PC" onclick="toggle('mypc')">🖥️</div>
+    <div class="ri" id="r-calc" data-n="Calculator" onclick="toggle('calc')">🧮</div>
+    <div class="ri" id="r-settings" data-n="Settings" onclick="toggle('settings')">⚙️</div>
+    <div class="ri" id="r-bin" data-n="Recycle Bin" onclick="toggle('bin')">🗑️</div>
+  </div>
+
+  <div id="icons">
+    <div class="di" data-id="mypc" style="top:40px; left:100px;" ondblclick="openWindow('mypc')"><span>🖥️</span>My PC</div>
+    <div class="di" data-id="bin" style="top:160px; left:100px;" ondblclick="openWindow('bin')"><span>🗑️</span>Recycle Bin</div>
+  </div>
+
+  <div id="orbw">
+    <div id="orb"></div>
+    <div id="orbt">Standby</div>
+  </div>
+  
+  <div id="sub" class="glass"><b id="sub-s">Jarvis</b><div id="sub-t"></div></div>
+
+  <!-- CONTEXT MENU -->
+  <div id="ctx">
+    <div class="ctx-item"><span class="ctx-icon">⊞</span> View <span class="ctx-arrow">▶</span></div>
+    <div class="ctx-item"><span class="ctx-icon">⇅</span> Sort by <span class="ctx-arrow">▶</span></div>
+    <div class="ctx-item" onclick="location.reload()"><span class="ctx-icon">↻</span> Refresh</div>
+    <div class="ctx-div"></div>
+    <div class="ctx-item" onclick="createNew('folder')"><span class="ctx-icon">📁</span> New Folder</div>
+    <div class="ctx-item" onclick="createNew('file')"><span class="ctx-icon">📄</span> New Text Document</div>
+    <div class="ctx-div"></div>
+    <div class="ctx-item" onclick="openWindow('settings');$('ctx').style.display='none'"><span class="ctx-icon">🖥️</span> Display settings</div>
+    <div class="ctx-item" onclick="openWindow('settings');$('ctx').style.display='none'"><span class="ctx-icon">🎨</span> Personalize</div>
+  </div>
+</div>
+
+<script>
+let ipcRenderer, shell, fs, os, path;
+try {
+  const electron = require('electron');
+  ipcRenderer = electron.ipcRenderer;
+  shell = electron.shell;
+  fs = require('fs');
+  os = require('os');
+  path = require('path');
+} catch (e) {
+  $('error-log').style.display = 'block';$('error-log').innerText = "FATAL: Node.js/Electron failed to load.";
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const HOME = os ? os.homedir() : "C:\\";
+const ROOT = path ? path.join(HOME, 'Documents', 'AI OS') : "C:\\";
+const NOTES = path ? path.join(ROOT, 'Notes') : "C:\\";
+try { if (fs && !fs.existsSync(NOTES)) fs.mkdirSync(NOTES, { recursive: true }); } catch (e) {}
+
+const WP = [
+  'radial-gradient(circle at 30% 20%,#1b3cff,#07091a 70%)',
+  'linear-gradient(135deg,#d9e4f5,#8fa8d0)',
+  'linear-gradient(180deg,#9ecbd0,#2d5f6d)',
+  'radial-gradient(circle at 70% 80%,#c026d3,#1a0524 65%)',
+  'linear-gradient(120deg,#f6d9c8,#a4b8d6)',
+  'conic-gradient(from 200deg at 50% 60%,#0a1f44,#1fb6a6,#7a3cff,#0a1f44)'
+];
+
+let S = {};
+function syncSettings() {
+  try { S = JSON.parse(localStorage.aios || '{}'); } catch(e) {}
+  document.documentElement.style.setProperty('--ac', S.accent || '#4cc9f0');
+  document.body.classList.toggle('light', S.mode === 'light');
+  document.body.classList.toggle('hc', S.hc === true);
+  
+  let bgImg = WP[S.wp || 0] || WP[0];
+  if (typeof S.img === 'string' && S.img.length > 0) {
+    let isBlob = S.img.startsWith('blob');
+    let urlStr = isBlob ? S.img : encodeURI('file:///' + S.img.replace(/\\/g, '/'));
+    bgImg = `center/cover url("${urlStr}")`;
+  }
+  $('desk').style.background = bgImg;
+  $('desk').style.filter = `brightness(${S.bright !== undefined ? S.bright : 100}%)`;
+  if ($('top-bt'))$('top-bt').style.opacity = S.bt ? 1 : 0.35;
+}
+window.addEventListener('storage', syncSettings);
+
+// My PC is now loaded via an iframe
+const APPS = {
+  browser: { t: 'Browser', i: '🌐', w: '64vw', h: '66vh', b: `<div class="tb"><button onclick="try{$('br-view').goBack()}catch(e){}">←</button><button onclick="try{$('br-view').reload()}catch(e){}">↻</button><input type="text" id="br-url" placeholder="Search or type URL" style="flex:1" onkeydown="if(event.key==='Enter')brGo()"><button class="pri" onclick="brGo()">Go</button></div><webview id="br-view" src="https://www.bing.com" useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" allowpopups style="flex:1;background:#fff"></webview>` },
+  notes: { t: 'Notes', i: '📝', w: '54vw', h: '62vh', b: `<div class="tb"><button onclick="nNew()">New</button><input type="text" id="nname" placeholder="File name" style="flex:1"><button class="pri" onclick="nSave()">Save</button><button onclick="shell.openPath(NOTES)" title="Show saved notes in File Explorer">Folder</button></div><textarea id="ntxt" placeholder="Start typing..."></textarea><div class="mt" id="nst" style="padding:6px 12px;border-top:1px solid var(--ln)">New note</div>` },
+  mypc: { t: 'My PC', i: '🖥️', w: '62vw', h: '60vh', b: `<iframe id="mypc-frame" src="mypc.html" style="flex:1; border:none; background:var(--bg)"></iframe>` },
+  calc: { t: 'Calculator', i: '🧮', w: '300px', h: '440px', b: `<div id="cd">0</div><div class="cg">${['C','⌫','%','/','7','8','9','*','4','5','6','-','1','2','3','+','0','.','(','='].map(k => `<button class="${k === '=' ? 'pri' : ''}" onclick="calc('${k}')">${k}</button>`).join('')}</div>` },
+  settings: { t: 'Settings', i: '⚙️', w: '80vw', h: '80vh', b: `<iframe src="settings.html" style="flex:1; border:none; background:var(--bg)"></iframe>` },
+  bin: { t: 'Recycle Bin', i: '🗑️', w: '360px', h: '240px', b: `<div style="margin:auto;text-align:center"><div style="font-size:40px">🗑️</div>Recycle Bin is empty.</div>` }
+};
+
+let Z = 60;
+let ncur = '';
+
+Object.entries(APPS).forEach(([id, a], n) => {
+  $('desk').insertAdjacentHTML('beforeend', `<div class="win" id="w-${id}" style="width:${a.w};height:${a.h};left:${250+n*30}px;top:${100+n*25}px" onmousedown="front('${id}')"><div class="wh" id="h-${id}"><span class="wt">${a.i} ${a.t}</span><span class="wc"><b onclick="hide('${id}')">—</b><b onclick="maxi('${id}')">▢</b><b class="x" onclick="hide('${id}')">✕</b></span></div><div class="wb">${a.b}</div></div>`);
+  const w = $('w-' + id);$('h-' + id).onmousedown = e => {
+    if (e.target.closest('.wc') || w.classList.contains('max')) return;
+    e.preventDefault(); front(id); w.classList.add('dg');
+    let x = e.clientX, y = e.clientY;
+    document.onmousemove = m => {
+      w.style.left = w.offsetLeft + m.clientX - x + 'px';
+      w.style.top = Math.max(40, w.offsetTop + m.clientY - y) + 'px';
+      x = m.clientX; y = m.clientY;
+    };
+    document.onmouseup = () => { w.classList.remove('dg'); document.onmousemove = document.onmouseup = null; };
+  };
+});
+
+function brGo() {
+  let u = $('br-url').value.trim();
+  if (!u) return;
+  if (!u.includes('.') && !u.startsWith('http')) u = 'https://www.bing.com/search?q=' + encodeURIComponent(u);
+  else if (!u.startsWith('http')) u = 'https://' + u;
+  $('br-view').src = u;
+}
+
+const front = id => $('w-' + id).style.zIndex = ++Z;
+
+function updateIslandVisibility() {
+  const openWins = Array.from(document.querySelectorAll('.win')).filter(w => w.style.display === 'flex' && !w.classList.contains('close-anim'));
+  if (openWins.length > 0) document.body.classList.add('has-active-window');
+  else document.body.classList.remove('has-active-window');
+}
+
+const hide = id => {
+  const w = document.getElementById('w-' + id);
+  if (!w) return;
+  w.classList.remove('open-anim');
+  w.classList.add('close-anim');
+  setTimeout(() => {
+    if (w.classList.contains('close-anim')) w.style.display = 'none';
+    updateIslandVisibility();
+    syncSettings();
+  }, 280);
+  const rBtn = document.getElementById('r-' + id);
+  if (rBtn) rBtn.classList.remove('open');
+};
+
+const toggle = id => {
+  const w = document.getElementById('w-' + id);
+  if (w && w.style.display === 'flex') hide(id);
+  else openWindow(id);
+};
+
+const maxi = id => document.getElementById('w-' + id).classList.toggle('max');
+
+function openWindow(id) {
+  id = String(id).replace('win-', '');
+  const w = document.getElementById('w-' + id);
+  if (!w) return;
+  w.classList.add('max');
+  w.style.display = 'flex';
+  void w.offsetWidth;
+  w.classList.remove('close-anim');
+  w.classList.add('open-anim');
+  front(id);
+  const rBtn = document.getElementById('r-' + id);
+  if (rBtn) rBtn.classList.add('open');
+  updateIslandVisibility();
+}
+
+// Drag & Drop for Desktop Icons
+function makeDraggable(di) {
+  let id = di.dataset.id;
+  try {
+    let saved = localStorage.getItem('pos_' + id);
+    if (saved) { let p = JSON.parse(saved); di.style.left = p.x + 'px'; di.style.top = p.y + 'px'; }
+  } catch(e) {}
+  di.onmousedown = e => {
+    let x = e.clientX, y = e.clientY, moved = false;
+    document.onmousemove = m => {
+      moved = true;
+      di.style.left = di.offsetLeft + m.clientX - x + 'px';
+      di.style.top = di.offsetTop + m.clientY - y + 'px';
+      x = m.clientX; y = m.clientY;
+    };
+    document.onmouseup = () => {
+      document.onmousemove = document.onmouseup = null;
+      if (moved) try { localStorage.setItem('pos_' + id, JSON.stringify({ x: di.offsetLeft, y: di.offsetTop })); } catch(err) {}
+    };
+  };
+}
+document.querySelectorAll('.di').forEach(makeDraggable);
+
+// Right Click Context Menu -> Create Files/Folders
+function createNew(type) {
+  $('ctx').style.display = 'none';
+  let name = prompt(`Enter name for the new ${type}:`, type === 'folder' ? 'New Folder' : 'New Document.txt');
+  if (!name) return;
+  
+  const targetDir = path ? path.join(HOME, 'Desktop') : '';
+  if (!targetDir || !fs) {
+      alert("File system access restricted.");
+      return;
+  }
+  
+  try {
+      let finalPath;
+      if (type === 'folder') {
+          finalPath = path.join(targetDir, name);
+          if(!fs.existsSync(finalPath)) fs.mkdirSync(finalPath);
+          addDesktopIcon(name, '📁', finalPath);
+      } else {
+          let fName = name.includes('.') ? name : name + '.txt';
+          finalPath = path.join(targetDir, fName);
+          if(!fs.existsSync(finalPath)) fs.writeFileSync(finalPath, '');
+          addDesktopIcon(fName, '📄', finalPath);
+      }
+  } catch (e) {
+      alert('Error creating ' + type + ': ' + e.message);
+  }
+}
+
+function addDesktopIcon(name, icon, filepath) {
+   const iconsDiv = $('icons');
+   const id = 'di_' + Date.now();
+   const leftOffset = 200 + Math.floor(Math.random() * 100); 
+   const topOffset = 100 + Math.floor(Math.random() * 100); 
+   const escPath = String(filepath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+   
+   // Direct text files to internal notes app, else open via OS
+   let clickAction = '';
+   if(name.toLowerCase().endsWith('.txt') || name.toLowerCase().endsWith('.md')) {
+       clickAction = `window.openNote('${escPath}')`;
+   } else {
+       clickAction = `if(shell)shell.openPath('${escPath}')`;
+   }
+   
+   const html = `<div class="di" data-id="${id}" style="top:${topOffset}px; left:${leftOffset}px;" ondblclick="${clickAction}"><span>${icon}</span>${esc(name)}</div>`;
+   iconsDiv.insertAdjacentHTML('beforeend', html);
+   makeDraggable(iconsDiv.lastElementChild);
+}
+
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const ctx = $('ctx');
+  ctx.style.display = 'block';
+  let x = e.clientX, y = e.clientY;
+  if (x + ctx.offsetWidth > window.innerWidth) x -= ctx.offsetWidth;
+  if (y + ctx.offsetHeight > window.innerHeight) y -= ctx.offsetHeight;
+  ctx.style.left = x + 'px'; ctx.style.top = y + 'px';
+});
+document.addEventListener('click', e => { if (!e.target.closest('#ctx')) $('ctx').style.display = 'none'; });
+
+// Globally accessible openNote function (used by Desktop Icons and My PC iframe)
+window.openNote = function(fp) {
+  try {
+    $('ntxt').value = fs.readFileSync(fp, 'utf8');
+    ncur = fp; 
+    $('nname').value = path.basename(fp);
+    openWindow('notes'); 
+    nst('Opened ' + fp);
+  } catch(e) { 
+    openWindow('notes'); 
+    nst('Could not open: ' + e.message); 
+  }
+};
+
+const nst = t => $('nst').textContent = t;
+function nNew() { ncur = ''; $('nname').value = '';$('ntxt').value = ''; nst('New note'); }
+function nSave() {
+  let rawN = $('nname').value.trim();
+  let n = rawN ? rawN : 'Untitled';
+  n = n.replace(/[\\/:*?"<>\x7C]/g, '_');
+  if (!n.toLowerCase().endsWith('.txt') && !n.toLowerCase().endsWith('.md')) n += '.txt';
+  const dir = ncur ? path.dirname(ncur) : NOTES;
+  const f = path.join(dir, n);
+  try {
+    fs.writeFileSync(f, $('ntxt').value);
+    ncur = f; $('nname').value = n; nst('Saved to ' + f);
+    
+    // Auto-refresh the My PC iframe if it happens to be open in the background
+    const mypcFrame = document.getElementById('mypc-frame');
+    if (mypcFrame && mypcFrame.contentWindow && mypcFrame.contentWindow.pcRender) {
+        mypcFrame.contentWindow.pcRender();
+    }
+  } catch(e) { nst('Could not save: ' + e.message); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 's' && $('w-notes').style.display === 'flex') { e.preventDefault(); nSave(); }
+});
+
+// Calculator Logic
+let ce = '';
+function calc(k) {
+  if (k === 'C') ce = '';
+  else if (k === '⌫') ce = ce.slice(0, -1);
+  else if (k === '=') {
+    try {
+      if (/^[0-9+\-*/.()% ]+$/.test(ce)) ce = String(+Function('"use strict";return(' + ce.replace(/%/g, '/100') + ')')().toFixed(10));
+    } catch(e) { ce = 'Error'; }
+  } else ce = (ce === 'Error' ? '' : ce) + k;
+  $('cd').textContent = ce || '0';
+}
+
+// Status Bar Clock
+function tick() {
+  const n = new Date();
+  if ($('top-time'))$('top-time').textContent = n.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !S.h24 });
+  if ($('top-date'))$('top-date').textContent = n.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+setInterval(tick, 1000);
+if (navigator.getBattery) {
+  navigator.getBattery().then(b => {
+    const u = () => { if ($('top-battery'))$('top-battery').textContent = `${b.charging ? '⚡' : '🔋'} ${Math.round(b.level * 100)}%`; };
+    u(); b.onlevelchange = u; b.onchargingchange = u;
+  });
+}
+const wifi = () => { if ($('top-wifi'))$('top-wifi').textContent = navigator.onLine ? '📶' : '⚠️'; };
+addEventListener('online', wifi); addEventListener('offline', wifi); wifi();
+
+// AI Speech / Subtitles / Status Integration
+const CMD = { OPEN_BROWSER: 'browser', OPEN_NOTEPAD: 'notes', OPEN_NOTES: 'notes', OPEN_SETTINGS: 'settings', OPEN_RECYCLE: 'bin', OPEN_MYPC: 'mypc', OPEN_CALC: 'calc' };
+const orb = $('orb'), orbt =$('orbt'); let st;
+
+function subtitle(who, text, ai) {
+  $('sub-s').textContent = who;
+  $('sub-s').style.color = ai ? '#2ecc71' : '#4cc9f0';
+  $('sub-t').textContent = text;
+  $('sub').classList.add('v');
+  clearTimeout(st);
+  st = setTimeout(() => { $('sub').classList.remove('v'); }, 8000);
+}
+
+function orbState(c, t, col) {
+  orb.className = c; orbt.textContent = t; orbt.style.color = col;
+}
+
+if (ipcRenderer) {
+  ipcRenderer.on('ai-status', (e, m) => {
+    for (const k in CMD) {
+      if (m.includes('COMMAND:' + k)) { openWindow(CMD[k]); return; }
+    }
+    if (m.includes('You asked:')) subtitle('You', m.split('You asked:')[1].trim(), 0);
+    else if (m.includes('AI:')) subtitle('Jarvis', m.split('AI:')[1].trim(), 1);
+
+    let isAct = m.includes('STATUS:ACTIVATED') || m.includes('THE MIC IS NOW HOT');
+    if (m.includes('STATUS:DEACTIVATED')) { orbState('', 'Standby', ''); $('sub').classList.remove('v'); }
+    else if (isAct) orbState('listening', 'Listening...', '#4cc9f0');
+    else if (m.includes('Thinking...')) orbState('thinking', 'Processing...', '#a855f7');
+    else if (m.includes('AI:')) orbState('speaking', 'Speaking...', '#2ecc71');
+  });
+}
+
+syncSettings();
+</script>
+</body>
+</html>

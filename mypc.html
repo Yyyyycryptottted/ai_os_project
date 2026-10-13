@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+:root{--ac:#4cc9f0;--bg:#0b0e17;--pn:#141926;--p2:#1c2333;--ln:rgba(255,255,255,.08);--tx:#e9edf5;--mt:#8b95a9;}
+body.light{--bg:#eef1f7;--pn:#fff;--p2:#eef1f8;--ln:rgba(0,0,0,.1);--tx:#16202e;--mt:#5b667a;}
+body{margin:0;height:100vh;overflow:hidden;user-select:none;color:var(--tx);font:13.5px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;background:var(--bg);display:flex;flex-direction:column;}
+
+button{background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit;transition:0.2s}
+button:hover{border-color:var(--ac);background:rgba(255,255,255,0.05)}
+input[type=text]{background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:8px 12px;font:inherit;outline:none;transition:0.2s}
+input[type=text]:focus{border-color:var(--ac);box-shadow:0 0 8px rgba(76,201,240,0.3)}
+
+.tb{display:flex;gap:12px;padding:12px 16px;align-items:center;background:var(--pn);border-bottom:1px solid var(--ln)}
+.pcw{display:flex;flex:1;min-height:0;position:relative}
+
+/* SIDEBAR */
+.pcs{width:220px;padding:12px;border-right:1px solid var(--ln);background:var(--pn);overflow-y:auto}
+.fr{display:flex;gap:12px;padding:10px 14px;border-radius:8px;cursor:default;align-items:center;transition:background 0.15s}
+.fr:hover{background:var(--p2)}
+.fr.disk{flex-direction:column;align-items:flex-start;gap:6px;padding:12px 14px;}
+.bar-bg{width:100%;height:5px;background:var(--ln);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;background:var(--ac);border-radius:3px}
+.disk-txt{font-size:11px;color:var(--mt);margin-top:2px}
+.section-title{font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px 10px}
+
+/* MAIN FILE LIST */
+#pcl{flex:1;overflow:auto;padding:14px;align-content:start}
+.mt{color:var(--mt)}
+
+/* CONTEXT MENU */
+#mctx{position:absolute;background:rgba(30,30,35,0.96);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:6px;box-shadow:0 15px 40px rgba(0,0,0,0.7);display:none;z-index:9999;min-width:230px;color:#fff;font-size:13.5px;backdrop-filter:blur(25px)}
+.ctx-item{padding:9px 14px;display:flex;align-items:center;gap:12px;border-radius:6px;cursor:pointer;transition:background 0.15s}
+.ctx-item:hover{background:rgba(255,255,255,0.1)}
+.ctx-div{height:1px;background:rgba(255,255,255,0.1);margin:5px 0}
+.ctx-icon{width:18px;text-align:center;opacity:0.9;font-size:15px}
+.ctx-danger:hover{background:rgba(229,72,77,0.85);color:#fff}
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <button onclick="pcUp()">↑ Up</button>
+  <button onclick="pcRender()">↻ Refresh</button>
+  <input type="text" id="pcp" readonly style="flex:1" placeholder="Current Directory">
+  <button class="pri" onclick="openCurrentInExplorer()">Open in Windows Explorer</button>
+</div>
+
+<div class="pcw">
+  <div class="pcs">
+    <div class="section-title">Quick Access</div>
+    <div id="quick-links"></div>
+    <div class="section-title">Storage & Disks</div>
+    <div id="disk-links"></div>
+  </div>
+  
+  <div id="pcl"></div>
+</div>
+
+<div id="mctx"></div>
+
+<script>
+let fs, os, path, shell;
+try {
+  const electron = require('electron');
+  shell = electron.shell;
+  fs = require('fs');
+  os = require('os');
+  path = require('path');
+} catch (e) {}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = b => {
+  if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB';
+  return Math.max(1, Math.round(b / 1e3)) + ' KB';
+};
+
+function syncTheme() {
+  try {
+    const S = JSON.parse(localStorage.aios || '{}');
+    document.documentElement.style.setProperty('--ac', S.accent || '#4cc9f0');
+    document.body.classList.toggle('light', S.mode === 'light');
+  } catch(e) {}
+}
+window.addEventListener('storage', syncTheme);
+syncTheme();
+
+const HOME = os ? os.homedir() : "C:\\";
+const ROOT_NOTES = path ? path.join(HOME, 'Documents', 'AI OS', 'Notes') : '';
+try {
+  if (fs && ROOT_NOTES && !fs.existsSync(ROOT_NOTES)) {
+    fs.mkdirSync(ROOT_NOTES, { recursive: true });
+  }
+} catch (e) {}
+
+let cwd = ROOT_NOTES || HOME;
+let currentFiles = [];
+
+const QL = [
+  ['AI OS Notes', '📝', ROOT_NOTES],
+  ['Desktop', '🖼️', path ? path.join(HOME, 'Desktop') : ''],
+  ['Documents', '📚', path ? path.join(HOME, 'Documents') : ''],
+  ['Downloads', '⬇️', path ? path.join(HOME, 'Downloads') : '']
+];
+
+$('quick-links').innerHTML = QL.map(q => 
+  `<div class="fr" onclick="pcGo('${q[2].replace(/\\/g, '\\\\')}')"><span>${q[1]}</span> ${q[0]}</div>`
+).join('');
+
+function getAvailableDrives() {
+  const drives = [];
+  for (const letter of 'CDEFGHIJ') {
+    const drivePath = letter + ':\\';
+    if (fs && fs.existsSync(drivePath)) {
+      let stats = null;
+      try {
+        const s = fs.statfsSync(drivePath);
+        const total = s.blocks * s.bsize;
+        const free = s.bavail * s.bsize;
+        const used = total - free;
+        stats = { total, free, used, pct: Math.round((used / total) * 100) };
+      } catch (e) {}
+      drives.push({ path: drivePath, letter, stats });
+    }
+  }
+  return drives;
+}
+
+function renderDisks() {
+  const drives = getAvailableDrives();
+  let diskHtml = '';
+  drives.forEach(d => {
+    const pEsc = d.path.replace(/\\/g, '\\\\');
+    if (d.stats) {
+      diskHtml += `
+      <div class="fr disk" onclick="pcGo('${pEsc}')">
+        <div style="display:flex;gap:8px;font-weight:600"><span>💽</span> Local Disk (${d.letter}:)</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${d.stats.pct}%"></div></div>
+        <div class="disk-txt">${fmt(d.stats.free)} free of ${fmt(d.stats.total)}</div>
+      </div>`;
+    } else {
+      diskHtml += `
+      <div class="fr" onclick="pcGo('${pEsc}')">
+        <span>💽</span> Local Disk (${d.letter}:)
+      </div>`;
+    }
+  });
+  $('disk-links').innerHTML = diskHtml;
+}
+
+function pcRender() {
+  renderDisks();
+  const pcl = $('pcl');
+  let it = [];
+
+  // When viewing root "This PC", list actual drives instead of reading folder
+  if (!cwd || cwd === 'This PC') {
+    const drives = getAvailableDrives();
+    it = drives.map(d => ({
+      n: `Local Disk (${d.letter}:)`,
+      p: d.path,
+      d: true,
+      x: d.stats ? `${fmt(d.stats.free)} free of ${fmt(d.stats.total)}` : '',
+      i: '💽'
+    }));
+    currentFiles = it;
+    pcl.innerHTML = it.length ? it.map((e, k) => 
+      `<div class="fr" data-k="${k}"><span>${e.i}</span><span style="flex:1">${esc(e.n)}</span><span class="mt">${esc(e.x)}</span></div>`
+    ).join('') : '<div class="fr mt">No drives detected.</div>';
+    $('pcp').value = 'This PC';
+    return;
+  }
+
+  // Normal directory reading
+  try {
+    it = fs.readdirSync(cwd, { withFileTypes: true }).map(e => {
+      const isDir = e.isDirectory();
+      let s = 0;
+      if (!isDir) {
+        try { s = fs.statSync(path.join(cwd, e.name)).size; } catch (_) {}
+      }
+      return {
+        n: e.name || '',
+        p: path.join(cwd, e.name || ''),
+        d: isDir,
+        x: isDir ? '' : fmt(s),
+        i: isDir ? '📁' : '📄'
+      };
+    }).sort((a, b) => (b.d - a.d) || a.n.localeCompare(b.n));
+  } catch (err) {
+    it = [{ n: 'Cannot open folder: ' + err.message, p: '', x: '', i: '⚠️' }];
+  }
+
+  currentFiles = it;
+  pcl.innerHTML = it.length ? it.map((e, k) => 
+    `<div class="fr" data-k="${k}"><span>${e.i}</span><span style="flex:1">${esc(e.n)}</span><span class="mt">${esc(e.x)}</span></div>`
+  ).join('') : '<div class="fr mt" style="justify-content:center;padding:40px;font-size:15px">Folder is empty. Right-click here to create files.</div>';
+
+  pcl.ondblclick = ev => {
+    const r = ev.target.closest('[data-k]');
+    if (!r) return;
+    const e = it[r.dataset.k];
+    if (e.d) {
+      pcGo(e.p);
+    } else {
+      openFileWrapper(e);
+    }
+  };
+
+  $('pcp').value = cwd;
+}
+
+function pcGo(p) {
+  cwd = p;
+  pcRender();
+}
+
+function pcUp() {
+  if (!cwd || cwd === 'This PC') return;
+  const parent = path.dirname(cwd);
+  if (parent === cwd) {
+    pcGo('This PC');
+  } else {
+    pcGo(parent);
+  }
+}
+
+function openCurrentInExplorer() {
+  if (shell) {
+    if (!cwd || cwd === 'This PC') shell.openPath(HOME);
+    else shell.openPath(cwd);
+  }
+}
+
+function openFileWrapper(e) {
+  const isText = /\.(txt|md|json|js|css|html|csv|log|ini)$/i.test(e.n) || !e.n.includes('.');
+  if (isText && window.parent && typeof window.parent.openNote === 'function') {
+    window.parent.openNote(e.p);
+  } else if (e.p && shell) {
+    shell.openPath(e.p);
+  }
+}
+
+let ctxTarget = null;
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const ctx = $('mctx');
+  ctx.style.display = 'block';
+
+  let x = e.clientX, y = e.clientY;
+  if (x + 240 > window.innerWidth) x -= 240;
+  if (y + 260 > window.innerHeight) y -= 260;
+  ctx.style.left = x + 'px';
+  ctx.style.top = y + 'px';
+
+  const fr = e.target.closest('[data-k]');
+  if (fr && currentFiles[fr.dataset.k] && currentFiles[fr.dataset.k].p !== '') {
+    ctxTarget = currentFiles[fr.dataset.k];
+    ctx.innerHTML = `
+      <div class="ctx-item" onclick="mAction('open')"><span class="ctx-icon">▶</span> Open</div>
+      ${!ctxTarget.d ? `<div class="ctx-item" onclick="mAction('edit')"><span class="ctx-icon">📝</span> Edit in AI Notes</div>` : ''}
+      <div class="ctx-item" onclick="mAction('explore')"><span class="ctx-icon">🗂️</span> Show in Windows Explorer</div>
+      <div class="ctx-div"></div>
+      <div class="ctx-item" onclick="mAction('rename')"><span class="ctx-icon">✏️</span> Rename</div>
+      <div class="ctx-item ctx-danger" onclick="mAction('delete')"><span class="ctx-icon">🗑️</span> Delete</div>
+    `;
+  } else {
+    ctxTarget = null;
+    ctx.innerHTML = `
+      <div class="ctx-item" onclick="pcRender()"><span class="ctx-icon">↻</span> Refresh</div>
+      <div class="ctx-item" onclick="openCurrentInExplorer()"><span class="ctx-icon">🗂️</span> Open Directory in Windows</div>
+      <div class="ctx-div"></div>
+      <div class="ctx-item" onclick="mAction('new_folder')"><span class="ctx-icon">📁</span> New Folder</div>
+      <div class="ctx-item" onclick="mAction('new_file')"><span class="ctx-icon">📄</span> New Text Document</div>
+    `;
+  }
+});
+
+document.addEventListener('click', () => $('mctx').style.display = 'none');
+
+function mAction(act) {
+  $('mctx').style.display = 'none';
+  if (!fs) return;
+  try {
+    if (act === 'open') {
+      if (ctxTarget.d) pcGo(ctxTarget.p);
+      else openFileWrapper(ctxTarget);
+    } else if (act === 'edit') {
+      if (window.parent && window.parent.openNote) window.parent.openNote(ctxTarget.p);
+    } else if (act === 'explore') {
+      if (ctxTarget && ctxTarget.p) shell.showItemInFolder(ctxTarget.p);
+      else openCurrentInExplorer();
+    } else if (act === 'rename') {
+      const n = prompt("Enter new name:", ctxTarget.n);
+      if (n && n.trim()) {
+        fs.renameSync(ctxTarget.p, path.join(cwd, n.trim()));
+        pcRender();
+      }
+    } else if (act === 'delete') {
+      if (confirm(`Permanently delete '${ctxTarget.n}'?`)) {
+        if (ctxTarget.d) fs.rmdirSync(ctxTarget.p, { recursive: true });
+        else fs.unlinkSync(ctxTarget.p);
+        pcRender();
+      }
+    } else if (act === 'new_folder') {
+      if (!cwd || cwd === 'This PC') return alert("Open a disk or folder first to create items.");
+      const n = prompt("Folder name:", "New Folder");
+      if (n && n.trim()) {
+        fs.mkdirSync(path.join(cwd, n.trim()));
+        pcRender();
+      }
+    } else if (act === 'new_file') {
+      if (!cwd || cwd === 'This PC') return alert("Open a disk or folder first to create items.");
+      const n = prompt("File name:", "New Document.txt");
+      if (n && n.trim()) {
+        const finalName = n.includes('.') ? n.trim() : n.trim() + '.txt';
+        fs.writeFileSync(path.join(cwd, finalName), '');
+        pcRender();
+      }
+    }
+  } catch (e) {
+    alert("Operation failed: " + e.message);
+  }
+}
+
+// Global hook for Notes app to refresh My PC when saving
+window.refreshFolder = function() {
+  pcRender();
+};
+
+pcRender();
+</script>
+</body>
+</html>
